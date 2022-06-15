@@ -11,8 +11,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 
+use Illuminate\Support\Facades\Http;
+
+use App\Traits\Token;
+
 class RegisteredUserController extends Controller
 {
+    use Token;
     /**
      * Display the registration view.
      *
@@ -39,11 +44,22 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
+        $response = Http::withHeaders([
+            'Accept' => 'application/json'
+        ])->post('http://api.anfu.test/v1/register', $request->all());
+
+        if ($response->status() == 422) {
+            return back()->withErrors($response->json()['errors']);
+        }
+
+        $service = $response->json();
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
         ]);
+
+        $this->getAccessToken($user, $service);
 
         event(new Registered($user));
 
